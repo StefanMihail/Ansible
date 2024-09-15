@@ -34,6 +34,15 @@
     flat: yes
   delegate_to: master-node
 
+- name: Set permissions on k3s_token
+  ansible.builtin.file:
+    path: /home/pi/k3s_token
+    owner: root
+    group: root
+    mode: '0644'
+  delegate_to: master-node
+  run_once: true
+
 - name: Transfer kubeconfig file to local machine
   ansible.builtin.copy:
     src: /tmp/kubeconfig
