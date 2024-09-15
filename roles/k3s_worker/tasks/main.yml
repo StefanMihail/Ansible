@@ -1,0 +1,32 @@
+---
+- name: Download K3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: ~/k3s_install.sh
+    mode: a+x
+
+- name: Fetch k3s token from master
+  ansible.builtin.fetch:
+    src: /home/pi/k3s_token
+    dest: /tmp/k3s_token
+    flat: yes
+  delegate_to: master-node
+  run_once: true
+
+- name: Read k3s token
+  ansible.builtin.slurp:
+    src: /tmp/k3s_token
+  register: k3s_token_slurp
+
+- name: Decode k3s token
+  ansible.builtin.set_fact:
+    k3s_token: "{{ k3s_token_slurp.content | b64decode }}"
+
+- name: Install K3s agent on worker nodes
+  ansible.builtin.shell: >-
+    K3S_URL="{{ k3s_master_url }}"
+    K3S_TOKEN="{{ k3s_token }}"
+    ~/k3s_install.sh >> ~/k3s_install_log.txt
+  args:
+    chdir: "~"
+    creates: /usr/local/bin/k3s

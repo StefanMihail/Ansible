@@ -1,0 +1,2 @@
+---
+k3s_master_url: "https://{{ hostvars['master-node'].ansible_host }}:6443"

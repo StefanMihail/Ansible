@@ -1,0 +1,41 @@
+---
+- name: Download K3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: "~/k3s_install.sh"
+    mode: a+x
+
+- name: Install k3s on master node
+  ansible.builtin.shell: >-
+    ~/k3s_install.sh >> ~/k3s_install_log.txt
+  args:
+    chdir: "~"
+    creates: /usr/local/bin/k3s
+
+- name: Retrieve k3s token
+  ansible.builtin.command: cat /var/lib/rancher/k3s/server/node-token
+  register: k3s_token_content
+  changed_when: false
+
+- name: Set k3s token fact
+  ansible.builtin.set_fact:
+    k3s_token: "{{ k3s_token_content.stdout }}"
+
+- name: Save k3s token to a file for workers
+  ansible.builtin.copy:
+    content: "{{ k3s_token }}"
+    dest: /home/pi/k3s_token
+    mode: '0600'
+
+- name: Retrieve kubeconfig file from master node
+  ansible.builtin.fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /tmp/kubeconfig
+    flat: yes
+  delegate_to: master-node
+
+- name: Transfer kubeconfig file to local machine
+  ansible.builtin.copy:
+    src: /tmp/kubeconfig
+    dest: "{{ playbook_dir }}/kubeconfig"
+  delegate_to: localhost
