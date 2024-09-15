@@ -3,19 +3,17 @@
   ansible.builtin.get_url:
     url: https://get.k3s.io
     dest: ~/k3s_install.sh
-    mode: a+x
+    mode: '0755'
 
-- name: Fetch k3s token from master
-  ansible.builtin.fetch:
-    src: /home/pi/k3s_token
-    dest: /tmp/k3s_token
-    flat: yes
-  delegate_to: master-node
-  run_once: true
+- name: Copy k3s_token to workers
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/k3s_token"
+    dest: /home/pi/k3s_token
+    mode: '0600'
 
 - name: Check if k3s_token file exists
   ansible.builtin.stat:
-    path: /tmp/k3s_token
+    path: /home/pi/k3s_token
   register: k3s_token_stat
 
 - name: Debug k3s_token file
@@ -24,18 +22,32 @@
 
 - name: Read k3s token
   ansible.builtin.slurp:
-    src: /tmp/k3s_token
+    src: /home/pi/k3s_token
   register: k3s_token_slurp
+  when: k3s_token_stat.stat.exists
 
 - name: Decode k3s token
   ansible.builtin.set_fact:
     k3s_token: "{{ k3s_token_slurp.content | b64decode }}"
+  when: k3s_token_stat.stat.exists
 
-- name: Install K3s agent on worker nodes
-  ansible.builtin.shell: >-
-    K3S_URL="{{ k3s_master_url }}"
-    K3S_TOKEN="{{ k3s_token }}"
-    ~/k3s_install.sh >> ~/k3s_install_log.txt
+- name: Check if K3s is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_installed
+
+- name: Debug K3s installation status
+  ansible.builtin.debug:
+    msg: "K3s is already installed: {{ k3s_installed.stat.exists }}"
+
+- name: Install K3s on worker nodes
+  ansible.builtin.shell: |
+    K3S_URL="{{ k3s_master_url }}" \
+    K3S_TOKEN="{{ k3s_token }}" \
+    ~/k3s_install.sh >> /home/pi/k3s_install_log.txt 2>&1
   args:
     chdir: "~"
     creates: /usr/local/bin/k3s
+  when:
+    - not k3s_installed.stat.exists
+    - k3s_token_stat.stat.exists

@@ -2,11 +2,11 @@
 - name: Download K3s install script
   ansible.builtin.get_url:
     url: https://get.k3s.io
-    dest: "~/k3s_install.sh"
-    mode: a+x
+    dest: ~/k3s_install.sh
+    mode: '0755'
 
 - name: Install k3s on master node
-  ansible.builtin.shell: >-
+  ansible.builtin.shell: >
     ~/k3s_install.sh >> ~/k3s_install_log.txt
   args:
     chdir: "~"
@@ -27,15 +27,42 @@
     dest: /home/pi/k3s_token
     mode: '0600'
 
-- name: Retrieve kubeconfig file from master node
+- name: Fetch kubeconfig file from master node
   ansible.builtin.fetch:
     src: /etc/rancher/k3s/k3s.yaml
-    dest: /tmp/kubeconfig
+    dest: "{{ playbook_dir }}/kubeconfig/k3s.yaml"
     flat: yes
   delegate_to: master-node
 
+- name: Set permissions on k3s_token on master node
+  ansible.builtin.file:
+    path: /home/pi/k3s_token
+    owner: pi
+    group: pi
+    mode: '0600'
+  delegate_to: master-node
+  run_once: true
+
 - name: Transfer kubeconfig file to local machine
   ansible.builtin.copy:
-    src: /tmp/kubeconfig
-    dest: "{{ playbook_dir }}/kubeconfig"
+    src: "{{ playbook_dir }}/kubeconfig/k3s.yaml"
+    dest: "{{ playbook_dir }}/kubeconfig/"
   delegate_to: localhost
+
+- name: Ensure .kube directory exists for pi user
+  ansible.builtin.file:
+    path: /home/pi/.kube
+    state: directory
+    owner: pi
+    group: pi
+    mode: '0755'
+  become: true
+
+- name: Copy kubeconfig to pi user's .kube directory
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/kubeconfig/k3s.yaml"
+    dest: /home/pi/.kube/config
+    owner: pi
+    group: pi
+    mode: '0644'
+  become: true
