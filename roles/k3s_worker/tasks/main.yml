@@ -13,6 +13,15 @@
   delegate_to: master-node
   run_once: true
 
+- name: Check if k3s_token file exists
+  ansible.builtin.stat:
+    path: /tmp/k3s_token
+  register: k3s_token_stat
+
+- name: Debug k3s_token file
+  ansible.builtin.debug:
+    msg: "k3s_token file exists: {{ k3s_token_stat.stat.exists }}"
+
 - name: Read k3s token
   ansible.builtin.slurp:
     src: /tmp/k3s_token
